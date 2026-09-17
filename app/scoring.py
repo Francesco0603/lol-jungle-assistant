@@ -54,7 +54,6 @@ PEAK_METRICS = [
 # TARGET DI MASSA CRITICA
 # ==================================================
 
-FRONTLINE_TARGET = 9
 OBJECTIVE_TARGET = 15
 
 
@@ -167,31 +166,58 @@ def calculate_mass_gain(
 # FRONTLINE
 # ==================================================
 
-def has_good_frontline_structure(values):
+# La frontline non viene trattata come una semplice somma.
+#
+# Il primo vero frontliner è il fattore più importante.
+# Un secondo frontliner può essere utile, ma pesa molto meno.
+# Il terzo e il quarto non aggiungono ulteriore valore.
+PRIMARY_FRONTLINE_UTILITY = {
+    0: 0,
+    1: 0,
+    2: 1,
+    3: 4,
+    4: 7,
+    5: 8
+}
+
+SECONDARY_FRONTLINE_UTILITY = {
+    0: 0,
+    1: 0,
+    2: 0,
+    3: 1,
+    4: 2,
+    5: 2
+}
+
+
+def calculate_frontline_utility(values):
     """
-    Una frontline è strutturalmente valida se:
+    Calcola la qualità della struttura frontline del team.
 
-    - abbiamo almeno un vero frontline con valore >= 4
-
-    oppure
-
-    - abbiamo almeno due campioni con valore >= 3
+    Consideriamo solo i due valori migliori:
+    - il primo frontliner pesa molto;
+    - il secondo dà un bonus ridotto.
     """
 
     if not values:
-        return False
+        return 0
 
-    if max(values) >= 4:
-        return True
+    ordered_values = sorted(
+        values,
+        reverse=True
+    )
 
-    strong_frontliners = 0
+    primary = ordered_values[0]
 
-    for value in values:
+    secondary = 0
 
-        if value >= 3:
-            strong_frontliners += 1
+    if len(ordered_values) >= 2:
+        secondary = ordered_values[1]
 
-    return strong_frontliners >= 2
+    return (
+        PRIMARY_FRONTLINE_UTILITY[primary]
+        + SECONDARY_FRONTLINE_UTILITY[secondary]
+    )
 
 
 def calculate_frontline_gain(
@@ -199,8 +225,8 @@ def calculate_frontline_gain(
     jungler_strategy
 ):
     """
-    Valuta sia la massa totale della frontline
-    sia la sua struttura.
+    Calcola quanto il jungler migliora
+    la struttura frontline già presente nel team.
     """
 
     values = get_team_strategy_values(
@@ -208,52 +234,22 @@ def calculate_frontline_gain(
         "frontline"
     )
 
-
-    # ----------------------------------------------
-    # MASSA CRITICA
-    # ----------------------------------------------
-
-    before_sum = sum(values)
+    before = calculate_frontline_utility(
+        values
+    )
 
     after_values = (
         values
         + [jungler_strategy["frontline"]]
     )
 
-    after_sum = sum(
+    after = calculate_frontline_utility(
         after_values
     )
-
-    mass_gain = (
-        min(after_sum, FRONTLINE_TARGET)
-        - min(before_sum, FRONTLINE_TARGET)
-    )
-
-
-    # ----------------------------------------------
-    # STRUTTURA
-    # ----------------------------------------------
-
-    before_structure = has_good_frontline_structure(
-        values
-    )
-
-    after_structure = has_good_frontline_structure(
-        after_values
-    )
-
-    structure_gain = 0
-
-    if (
-        not before_structure
-        and after_structure
-    ):
-        structure_gain = 3
-
 
     return (
-        mass_gain
-        + structure_gain
+        after
+        - before
     )
 
 
